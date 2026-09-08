@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
+import { App as CapApp } from '@capacitor/app';
 import { EmergencyService, EmergencyAnalysis, EmergencyGuidance, HealthStatus } from './services/emergency.service';
 import { environment } from '../environments/environment';
 
@@ -14,7 +15,7 @@ import { environment } from '../environments/environment';
 })
 export class App implements OnInit, OnDestroy {
   private emergencyService = inject(EmergencyService);
-  private speechSub?: Subscription;
+  private subs: Subscription = new Subscription();
 
   // Signals for state management
   public emergencyText = signal<string>('');
@@ -26,6 +27,7 @@ export class App implements OnInit, OnDestroy {
   public currentLanguage = signal<'en' | 'hi' | 'mr'>('en');
   public healthStatus = signal<HealthStatus | null>(null);
   public speechSupported = signal<boolean>(true);
+  public showExitDialog = signal<boolean>(false);
 
   // Predefined emergency test presets
   public presets = [
@@ -39,13 +41,43 @@ export class App implements OnInit, OnDestroy {
     this.speechSupported.set(this.emergencyService.isSpeechSupported());
     this.checkSystemHealth();
 
-    this.speechSub = this.emergencyService.speechSubject.subscribe((transcript) => {
-      this.emergencyText.set(transcript);
-    });
+    // Transcript updates
+    this.subs.add(
+      this.emergencyService.speechSubject.subscribe((transcript) => {
+        this.emergencyText.set(transcript);
+      })
+    );
+
+    // Live Mic State updates (ensures mic animation turns off immediately when stopped)
+    this.subs.add(
+      this.emergencyService.listeningStateSubject.subscribe((listening) => {
+        this.isListening.set(listening);
+      })
+    );
+
+    // Capacitor Android Hardware Back Button listener
+    try {
+      CapApp.addListener('backButton', ({ canGoBack }) => {
+        if (this.showExitDialog()) {
+          this.showExitDialog.set(false);
+        } else if (!canGoBack) {
+          this.showExitDialog.set(true);
+        } else {
+          window.history.back();
+        }
+      });
+    } catch {
+      // Running in standard web browser
+    }
   }
 
   ngOnDestroy(): void {
-    this.speechSub?.unsubscribe();
+    this.subs.unsubscribe();
+    try {
+      CapApp.removeAllListeners();
+    } catch {
+      // Ignore
+    }
   }
 
   public checkSystemHealth(): void {
@@ -74,6 +106,7 @@ export class App implements OnInit, OnDestroy {
         this.fallbackNotice.set(null);
       } else {
         this.speechSupported.set(false);
+        this.isListening.set(false);
         this.fallbackNotice.set('Voice recognition unavailable. You can type your emergency instead.');
       }
     }
@@ -89,6 +122,12 @@ export class App implements OnInit, OnDestroy {
     const text = this.emergencyText().trim();
     if (!text) return;
 
+    // Stop listening if active
+    if (this.isListening()) {
+      this.emergencyService.stopListening();
+      this.isListening.set(false);
+    }
+
     this.isAnalyzing.set(true);
     this.fallbackNotice.set(null);
 
@@ -102,12 +141,24 @@ export class App implements OnInit, OnDestroy {
 
         // Fetch corresponding guidance
         this.fetchGuidance(res.data.emergencyType);
+
+        // Automatically scroll smoothly to the triage results
+        setTimeout(() => {
+          this.scrollToAnalysis();
+        }, 120);
       },
       error: () => {
         this.isAnalyzing.set(false);
         this.fallbackNotice.set("We're using emergency fallback assistance.");
       },
     });
+  }
+
+  public scrollToAnalysis(): void {
+    const el = document.getElementById('analysis-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   public fetchGuidance(type: string): void {
@@ -126,5 +177,23 @@ export class App implements OnInit, OnDestroy {
 
   public setLanguage(lang: 'en' | 'hi' | 'mr'): void {
     this.currentLanguage.set(lang);
+  }
+
+  // Exit dialog handlers
+  public promptExit(): void {
+    this.showExitDialog.set(true);
+  }
+
+  public cancelExit(): void {
+    this.showExitDialog.set(false);
+  }
+
+  public confirmExit(): void {
+    this.showExitDialog.set(false);
+    try {
+      CapApp.exitApp();
+    } catch {
+      window.close();
+    }
   }
 }

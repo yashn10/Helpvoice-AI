@@ -26,6 +26,11 @@
           <span class="phone-icon">📞</span>
           <span class="btn-text">CALL 112</span>
         </button>
+
+        <!-- Exit App Button -->
+        <button class="header-exit-btn" (click)="promptExit()" title="Exit App">
+          ✕
+        </button>
       </div>
     </div>
   </header>
@@ -99,7 +104,7 @@
     </section>
 
     <!-- Triage Analysis Result -->
-    <section *ngIf="analysisResult()" class="analysis-results-card">
+    <section *ngIf="analysisResult()" id="analysis-section" class="analysis-results-card">
       <div class="analysis-header">
         <div class="severity-badge-container">
           <span class="severity-pill" [attr.data-severity]="analysisResult()?.severity">
@@ -200,5 +205,26 @@
       <span class="sticky-icon">🚨</span>
       <span class="sticky-label">ONE-TAP EMERGENCY: CALL 112</span>
     </button>
+  </div>
+
+  <!-- Exit App Confirmation Dialog -->
+  <div *ngIf="showExitDialog()" class="exit-modal-backdrop" (click)="cancelExit()">
+    <div class="exit-modal-card" (click)="$event.stopPropagation()">
+      <div class="exit-modal-icon-wrap">
+        <span class="exit-modal-icon">⚠️</span>
+      </div>
+      <h3 class="exit-modal-title">Exit Emergency App?</h3>
+      <p class="exit-modal-message">
+        Are you sure you want to close Helpvoice AI? In an active emergency situation, keep the assistant active or call 112 immediately.
+      </p>
+      <div class="exit-modal-buttons">
+        <button class="exit-btn-cancel" (click)="cancelExit()">
+          Cancel / Stay
+        </button>
+        <button class="exit-btn-exit" (click)="confirmExit()">
+          Exit App
+        </button>
+      </div>
+    </div>
   </div>
 </div>

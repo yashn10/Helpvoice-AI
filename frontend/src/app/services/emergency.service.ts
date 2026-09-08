@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, NgZone } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, Subject, catchError, of } from 'rxjs';
 import { environment } from '../../environments/environment';
@@ -47,11 +47,13 @@ export interface HealthStatus {
 })
 export class EmergencyService {
   private http = inject(HttpClient);
+  private ngZone = inject(NgZone);
   private apiUrl = environment.apiBaseUrl;
 
   private recognition: any = null;
   public isListening = false;
   public speechSubject = new Subject<string>();
+  public listeningStateSubject = new Subject<boolean>();
 
   constructor() {
     this.initSpeechRecognition();
@@ -64,21 +66,36 @@ export class EmergencyService {
       this.recognition.continuous = false;
       this.recognition.interimResults = true;
 
+      this.recognition.onstart = () => {
+        this.ngZone.run(() => {
+          this.isListening = true;
+          this.listeningStateSubject.next(true);
+        });
+      };
+
       this.recognition.onresult = (event: any) => {
         let transcript = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
           transcript += event.results[i][0].transcript;
         }
-        this.speechSubject.next(transcript);
+        this.ngZone.run(() => {
+          this.speechSubject.next(transcript);
+        });
       };
 
       this.recognition.onerror = (event: any) => {
         console.warn('Speech recognition error:', event.error);
-        this.isListening = false;
+        this.ngZone.run(() => {
+          this.isListening = false;
+          this.listeningStateSubject.next(false);
+        });
       };
 
       this.recognition.onend = () => {
-        this.isListening = false;
+        this.ngZone.run(() => {
+          this.isListening = false;
+          this.listeningStateSubject.next(false);
+        });
       };
     }
   }
@@ -94,19 +111,26 @@ export class EmergencyService {
       this.recognition.lang = lang;
       this.recognition.start();
       this.isListening = true;
+      this.listeningStateSubject.next(true);
       return true;
     } catch (e) {
       console.warn('Could not start recognition', e);
       this.isListening = false;
+      this.listeningStateSubject.next(false);
       return false;
     }
   }
 
   public stopListening(): void {
-    if (this.recognition && this.isListening) {
-      this.recognition.stop();
-      this.isListening = false;
+    if (this.recognition) {
+      try {
+        this.recognition.stop();
+      } catch {
+        // Ignore if already stopped
+      }
     }
+    this.isListening = false;
+    this.listeningStateSubject.next(false);
   }
 
   public analyzeEmergency(text: string): Observable<EmergencyAnalysisResponse> {

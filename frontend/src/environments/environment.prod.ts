@@ -8,7 +8,7 @@
 
 export const environment = {
   production: true,
-  apiBaseUrl: '/api',
+  apiBaseUrl: 'https://p0os4oscww048kwsc400c0o0.168.231.102.206.sslip.io/api',
   defaultLanguage: 'en',
   supportedLanguages: ['en', 'hi', 'mr'],
   demoMode: false,
