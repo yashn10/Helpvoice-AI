@@ -8,24 +8,51 @@ import { config } from './config/env';
 export function createApp(): Express {
   const app = express();
 
-  // CORS configuration supporting frontend, local dev, and Capacitor mobile webviews
-  const allowedOrigins = [
-    config.frontendUrl,
+  // CORS configuration supporting mobile apps, Capacitor webviews, local dev, and emulators
+  const configuredOrigins = config.frontendUrl
+    ? config.frontendUrl.split(',').map(url => url.trim()).filter(Boolean)
+    : [];
+
+  const defaultMobileOrigins = [
     'http://localhost:4200',
     'http://localhost:8100',
     'http://localhost',
+    'https://localhost',
     'capacitor://localhost',
     'ionic://localhost',
-  ].filter(Boolean);
+    'http://10.0.2.2',
+  ];
+
+  const allowedOrigins = Array.from(new Set([...configuredOrigins, ...defaultMobileOrigins]));
 
   app.use(cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, server-to-server)
-      if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://localhost:')) {
-        callback(null, true);
-      } else {
-        callback(null, true); // Permissive in emergency context to avoid blocking assistance
+      // 1. Allow mobile apps, curl, server-to-server requests with no origin or 'null' (common in WebView/file://)
+      if (!origin || origin === 'null') {
+        return callback(null, true);
       }
+
+      // 2. Direct match with configured origins
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // 3. Match localhost, Android emulator (10.0.2.2), and local WiFi network IPs (192.168.x.x, 10.x.x.x)
+      if (
+        origin.startsWith('http://localhost') ||
+        origin.startsWith('https://localhost') ||
+        origin.startsWith('http://10.0.2.2') ||
+        origin.startsWith('http://127.0.0.1') ||
+        origin.startsWith('capacitor://') ||
+        origin.startsWith('ionic://') ||
+        /^https?:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/.test(origin) ||
+        /^https?:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/.test(origin)
+      ) {
+        return callback(null, true);
+      }
+
+      // 4. In emergency assistance context, do not block emergency triage
+      return callback(null, true);
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
