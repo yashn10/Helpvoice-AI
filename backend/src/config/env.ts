@@ -42,6 +42,7 @@ export interface AppConfig {
     locationLng?: number;
   };
   security: {
+    jwtSecret: string;
     rateLimitWindowMs: number;
     rateLimitMaxRequests: number;
   };
@@ -119,6 +120,7 @@ export function validateAndLoadConfig(): AppConfig {
       locationLng: process.env.DEMO_LOCATION_LNG ? parseNumber(process.env.DEMO_LOCATION_LNG, 73.8567) : undefined,
     },
     security: {
+      jwtSecret: process.env.JWT_SECRET || 'helpvoice_secure_jwt_secret_2026_sos',
       rateLimitWindowMs: parseNumber(process.env.RATE_LIMIT_WINDOW_MS, 900000),
       rateLimitMaxRequests: parseNumber(process.env.RATE_LIMIT_MAX_REQUESTS, 100),
     },

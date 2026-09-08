@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Test User",
+    "email": "test_1788859773380@example.com",
+    "passwordHash": "$2b$10$BY7tgipJNjavX6N5pE0CX.IsPL2Hb24yeaHIPPlvK3BBvlrCT9LMC",
+    "emergencyContacts": [
+      {
+        "id": "cnt_1788859783542_8hxe",
+        "name": "Papa",
+        "phone": "9876543210",
+        "relation": "Father",
+        "isPrimary": true,
+        "createdAt": "2026-09-08T09:29:43.542Z"
+      }
+    ],
+    "id": "usr_1788859783526_6tetr5",
+    "createdAt": "2026-09-08T09:29:43.526Z",
+    "updatedAt": "2026-09-08T09:29:43.542Z"
+  }
+]

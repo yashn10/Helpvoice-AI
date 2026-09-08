@@ -4,4 +4,6 @@
     <string name="title_activity_main">Helpvoice AI</string>
     <string name="package_name">com.helpvoice.ai</string>
     <string name="custom_url_scheme">com.helpvoice.ai</string>
+    <string name="shortcut_emergency_short">Emergency SOS</string>
+    <string name="shortcut_emergency_long">Voice Emergency Dispatch</string>
 </resources>

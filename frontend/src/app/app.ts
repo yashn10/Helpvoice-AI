@@ -3,7 +3,11 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { App as CapApp } from '@capacitor/app';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { EmergencyService, EmergencyAnalysis, EmergencyGuidance, HealthStatus } from './services/emergency.service';
+import { AuthService, EmergencyContact, UserProfile } from './services/auth.service';
+import { VoiceDialerService, VoiceCallMatch } from './services/voice-dialer.service';
+import { SettingsService, AppLanguage, AppTheme } from './services/settings.service';
 import { environment } from '../environments/environment';
 
 @Component({
@@ -14,20 +18,49 @@ import { environment } from '../environments/environment';
   styleUrls: ['./app.css'],
 })
 export class App implements OnInit, OnDestroy {
-  private emergencyService = inject(EmergencyService);
+  public emergencyService = inject(EmergencyService);
+  public authService = inject(AuthService);
+  public voiceDialer = inject(VoiceDialerService);
+  public settingsService = inject(SettingsService);
   private subs: Subscription = new Subscription();
 
-  // Signals for state management
+  // Signals for emergency state
   public emergencyText = signal<string>('');
   public isListening = signal<boolean>(false);
   public isAnalyzing = signal<boolean>(false);
   public analysisResult = signal<EmergencyAnalysis | null>(null);
   public fallbackNotice = signal<string | null>(null);
   public guidanceData = signal<EmergencyGuidance | null>(null);
-  public currentLanguage = signal<'en' | 'hi' | 'mr'>('en');
   public healthStatus = signal<HealthStatus | null>(null);
   public speechSupported = signal<boolean>(true);
   public showExitDialog = signal<boolean>(false);
+  public showVoiceGuide = signal<boolean>(false);
+  public showSettingsModal = signal<boolean>(false);
+  public voiceAutoTriggered = signal<boolean>(false);
+  public activeCallNotice = signal<string | null>(null);
+
+  // Splash Screen State
+  public showSplashScreen = signal<boolean>(true);
+  public splashFading = signal<boolean>(false);
+  public splashProgress = signal<number>(15);
+  public splashStepText = signal<string>('Initializing Emergency AI Core...');
+
+  // Authentication & Contact Modals
+  public showAuthModal = signal<boolean>(false);
+  public authMode = signal<'login' | 'register'>('login');
+  public authName = signal<string>('');
+  public authEmail = signal<string>('');
+  public authPassword = signal<string>('');
+  public authError = signal<string | null>(null);
+  public authLoading = signal<boolean>(false);
+
+  // Add Contact Modal
+  public showAddContactModal = signal<boolean>(false);
+  public contactName = signal<string>('');
+  public contactPhone = signal<string>('');
+  public contactRelation = signal<string>('Family');
+  public contactIsPrimary = signal<boolean>(false);
+  public contactError = signal<string | null>(null);
 
   // Predefined emergency test presets
   public presets = [
@@ -41,6 +74,15 @@ export class App implements OnInit, OnDestroy {
     this.speechSupported.set(this.emergencyService.isSpeechSupported());
     this.checkSystemHealth();
 
+    // Check if launched with hands-free trigger
+    const isVoiceAuto = window.location.href.includes('auto_listen=true') || window.location.href.includes('emergency');
+    if (isVoiceAuto) {
+      this.showSplashScreen.set(false);
+      this.checkVoiceAutoTrigger(window.location.href);
+    } else {
+      this.startSplashSequence();
+    }
+
     // Transcript updates
     this.subs.add(
       this.emergencyService.speechSubject.subscribe((transcript) => {
@@ -51,12 +93,28 @@ export class App implements OnInit, OnDestroy {
     // Live Mic State updates (ensures mic animation turns off immediately when stopped)
     this.subs.add(
       this.emergencyService.listeningStateSubject.subscribe((listening) => {
+        const wasListening = this.isListening();
         this.isListening.set(listening);
+
+        // Auto-submit when speech recognition finishes after hands-free voice trigger
+        if (wasListening && !listening && this.emergencyText().trim().length > 0) {
+          this.submitEmergency();
+        }
       })
     );
 
-    // Capacitor Android Hardware Back Button listener
+    // Check if launched with auto_listen=true from URL
+    this.checkVoiceAutoTrigger(window.location.href);
+
+    // Capacitor App URL Open & Deep Links ("helpvoice://emergency?auto_listen=true")
     try {
+      CapApp.addListener('appUrlOpen', (data) => {
+        if (data.url) {
+          this.checkVoiceAutoTrigger(data.url);
+        }
+      });
+
+      // Hardware Back Button listener
       CapApp.addListener('backButton', ({ canGoBack }) => {
         if (this.showExitDialog()) {
           this.showExitDialog.set(false);
@@ -80,6 +138,82 @@ export class App implements OnInit, OnDestroy {
     }
   }
 
+  public checkVoiceAutoTrigger(url: string): void {
+    if (url.includes('auto_listen=true') || url.includes('emergency')) {
+      this.voiceAutoTriggered.set(true);
+
+      // Trigger heavy haptic vibration feedback for hands-free awareness
+      try {
+        Haptics.impact({ style: ImpactStyle.Heavy });
+      } catch {
+        // Haptics not available
+      }
+
+      // Voice prompt: announce to the user that Helpvoice is actively listening
+      this.speakAudioPrompt('Emergency dispatch listening. Describe your situation now.');
+
+      // Start microphone listening after brief audio prompt
+      setTimeout(() => {
+        if (this.speechSupported() && !this.isListening()) {
+          const langCode = this.settingsService.getSpeechLocale();
+          this.emergencyService.startListening(langCode);
+        }
+      }, 800);
+    }
+  }
+
+  public startSplashSequence(): void {
+    // Stage 1: Initial core
+    setTimeout(() => {
+      this.splashProgress.set(40);
+      this.splashStepText.set('Loading Multilingual Dispatch & Settings...');
+    }, 450);
+
+    // Stage 2: Network & 112 verification
+    setTimeout(() => {
+      this.splashProgress.set(80);
+      this.splashStepText.set('Connecting Emergency Helplines & SOS...');
+    }, 1000);
+
+    // Stage 3: Ready
+    setTimeout(() => {
+      this.splashProgress.set(100);
+      this.splashStepText.set('Emergency System Active & Ready');
+    }, 1500);
+
+    // Stage 4: Fade out
+    setTimeout(() => {
+      this.splashFading.set(true);
+    }, 1900);
+
+    // Stage 5: Hide splash
+    setTimeout(() => {
+      this.showSplashScreen.set(false);
+    }, 2300);
+  }
+
+  public skipSplash(): void {
+    this.splashFading.set(true);
+    setTimeout(() => {
+      this.showSplashScreen.set(false);
+    }, 250);
+  }
+
+  private speakAudioPrompt(text: string): void {
+    if (!this.settingsService.audioPromptsEnabled()) return;
+    if ('speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = this.settingsService.voiceSpeed();
+        utterance.pitch = 1.0;
+        window.speechSynthesis.speak(utterance);
+      } catch (e) {
+        console.warn('TTS error:', e);
+      }
+    }
+  }
+
   public checkSystemHealth(): void {
     this.emergencyService.checkHealth().subscribe((status) => {
       this.healthStatus.set(status);
@@ -99,7 +233,7 @@ export class App implements OnInit, OnDestroy {
         this.submitEmergency();
       }
     } else {
-      const langCode = this.currentLanguage() === 'hi' ? 'hi-IN' : this.currentLanguage() === 'mr' ? 'mr-IN' : 'en-US';
+      const langCode = this.settingsService.getSpeechLocale();
       const started = this.emergencyService.startListening(langCode);
       if (started) {
         this.isListening.set(true);
@@ -113,7 +247,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   public selectPreset(preset: { text: string; lang: string }): void {
-    this.currentLanguage.set(preset.lang as any);
+    this.settingsService.setLanguage(preset.lang as any);
     this.emergencyText.set(preset.text);
     this.submitEmergency();
   }
@@ -126,6 +260,27 @@ export class App implements OnInit, OnDestroy {
     if (this.isListening()) {
       this.emergencyService.stopListening();
       this.isListening.set(false);
+    }
+
+    // 1. Evaluate Spoken Transcript for Voice Calling Intent (e.g. "Call Papa", "Call Police", "Call 100", "Fire brigade")
+    const callMatch = this.voiceDialer.evaluateVoiceCallIntent(text);
+    if (callMatch.matched && callMatch.phoneNumber) {
+      this.activeCallNotice.set(`📞 Voice Command Detected: Calling ${callMatch.targetName} (${callMatch.phoneNumber})`);
+      this.speakAudioPrompt(callMatch.spokenPrompt || `Calling ${callMatch.targetName}`);
+
+      try {
+        Haptics.impact({ style: ImpactStyle.Heavy });
+      } catch {}
+
+      // Dial the phone number immediately
+      setTimeout(() => {
+        this.callNumber(callMatch.phoneNumber!, callMatch.targetName);
+      }, 700);
+
+      // If user simply said a short call phrase like "Call Papa", we don't need further medical triage
+      if (text.split(' ').length <= 4) {
+        return;
+      }
     }
 
     this.isAnalyzing.set(true);
@@ -141,6 +296,11 @@ export class App implements OnInit, OnDestroy {
 
         // Fetch corresponding guidance
         this.fetchGuidance(res.data.emergencyType);
+
+        // Announce severity via Audio TTS if hands-free was triggered
+        if (this.voiceAutoTriggered()) {
+          this.speakAudioPrompt(`${res.data.severity} severity emergency detected: ${res.data.emergencyType}.`);
+        }
 
         // Automatically scroll smoothly to the triage results
         setTimeout(() => {
@@ -172,11 +332,166 @@ export class App implements OnInit, OnDestroy {
   }
 
   public callEmergency(): void {
-    this.emergencyService.callEmergency(environment.emergency.defaultEmergencyNumber);
+    const num = this.settingsService.defaultEmergencyNumber() || environment.emergency.defaultEmergencyNumber;
+    this.callNumber(num, `Emergency Services (${num})`);
   }
 
-  public setLanguage(lang: 'en' | 'hi' | 'mr'): void {
-    this.currentLanguage.set(lang);
+  public callNumber(phone: string, name?: string): void {
+    if (name) {
+      this.activeCallNotice.set(`📞 Dialing ${name} (${phone})...`);
+      setTimeout(() => {
+        this.activeCallNotice.set(null);
+      }, 5000);
+    }
+    this.emergencyService.callEmergency(phone);
+  }
+
+  // Settings Actions
+  public openSettings(): void {
+    this.showSettingsModal.set(true);
+  }
+
+  public closeSettings(): void {
+    this.showSettingsModal.set(false);
+  }
+
+  public setTheme(theme: AppTheme): void {
+    this.settingsService.setTheme(theme);
+  }
+
+  public setLanguage(lang: AppLanguage): void {
+    this.settingsService.setLanguage(lang);
+  }
+
+  public setVoiceSpeed(speed: number): void {
+    this.settingsService.setVoiceSpeed(speed);
+  }
+
+  public toggleAudioPrompts(): void {
+    this.settingsService.toggleAudioPrompts();
+  }
+
+  public toggleHaptic(): void {
+    this.settingsService.toggleHaptic();
+  }
+
+  public setDefaultEmergencyNumber(num: string): void {
+    this.settingsService.setDefaultEmergencyNumber(num);
+  }
+
+  public resetSettings(): void {
+    this.settingsService.resetToDefaults();
+  }
+
+  public toggleVoiceGuide(): void {
+    this.showVoiceGuide.set(!this.showVoiceGuide());
+  }
+
+  public triggerTestVoiceSos(): void {
+    this.checkVoiceAutoTrigger('helpvoice://emergency?auto_listen=true');
+  }
+
+  // Auth Modal Handlers
+  public openLoginModal(): void {
+    this.authMode.set('login');
+    this.authError.set(null);
+    this.showAuthModal.set(true);
+  }
+
+  public openRegisterModal(): void {
+    this.authMode.set('register');
+    this.authError.set(null);
+    this.showAuthModal.set(true);
+  }
+
+  public closeAuthModal(): void {
+    this.showAuthModal.set(false);
+    this.authError.set(null);
+  }
+
+  public handleAuthSubmit(): void {
+    const email = this.authEmail().trim();
+    const password = this.authPassword().trim();
+    const name = this.authName().trim();
+
+    if (!email || !password) {
+      this.authError.set('Please enter both email and password.');
+      return;
+    }
+
+    this.authLoading.set(true);
+    this.authError.set(null);
+
+    if (this.authMode() === 'register') {
+      if (!name) {
+        this.authError.set('Please enter your full name.');
+        this.authLoading.set(false);
+        return;
+      }
+      this.authService.register(name, email, password).subscribe((res) => {
+        this.authLoading.set(false);
+        if (res.success) {
+          this.showAuthModal.set(false);
+          this.authName.set('');
+          this.authEmail.set('');
+          this.authPassword.set('');
+        } else {
+          this.authError.set(res.error || 'Registration failed.');
+        }
+      });
+    } else {
+      this.authService.login(email, password).subscribe((res) => {
+        this.authLoading.set(false);
+        if (res.success) {
+          this.showAuthModal.set(false);
+          this.authEmail.set('');
+          this.authPassword.set('');
+        } else {
+          this.authError.set(res.error || 'Invalid email or password.');
+        }
+      });
+    }
+  }
+
+  public handleLogout(): void {
+    this.authService.logout();
+  }
+
+  // Custom Emergency Contacts Handlers
+  public openAddContactModal(): void {
+    this.contactName.set('');
+    this.contactPhone.set('');
+    this.contactRelation.set('Family');
+    this.contactIsPrimary.set(false);
+    this.contactError.set(null);
+    this.showAddContactModal.set(true);
+  }
+
+  public closeAddContactModal(): void {
+    this.showAddContactModal.set(false);
+    this.contactError.set(null);
+  }
+
+  public handleAddContactSubmit(): void {
+    const name = this.contactName().trim();
+    const phone = this.contactPhone().trim();
+    const relation = this.contactRelation().trim();
+    const isPrimary = this.contactIsPrimary();
+
+    if (!name || !phone) {
+      this.contactError.set('Please provide both contact name and phone number.');
+      return;
+    }
+
+    this.authService.addContact({ name, phone, relation, isPrimary }).subscribe(() => {
+      this.showAddContactModal.set(false);
+      this.contactName.set('');
+      this.contactPhone.set('');
+    });
+  }
+
+  public handleDeleteContact(contactId: string): void {
+    this.authService.deleteContact(contactId).subscribe();
   }
 
   // Exit dialog handlers

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Google Assistant Voice Action: "Hey Google, Helpvoice Emergency" -->
+    <capability android:name="actions.intent.OPEN_APP_FEATURE">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.helpvoice.ai"
+            android:targetClass="com.helpvoice.ai.MainActivity"
+            android:data="helpvoice://emergency?auto_listen=true">
+            <parameter
+                android:name="feature"
+                android:key="feature" />
+        </intent>
+    </capability>
+
+    <!-- Static App Launcher Shortcut: Long-press app icon or Google Assistant trigger -->
+    <shortcut
+        android:shortcutId="emergency_voice_dispatch"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_emergency_short"
+        android:shortcutLongLabel="@string/shortcut_emergency_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.helpvoice.ai"
+            android:targetClass="com.helpvoice.ai.MainActivity"
+            android:data="helpvoice://emergency?auto_listen=true" />
+        <categories android:name="android.shortcut.conversation" />
+        <capability-binding android:key="actions.intent.OPEN_APP_FEATURE" />
+    </shortcut>
+</shortcuts>

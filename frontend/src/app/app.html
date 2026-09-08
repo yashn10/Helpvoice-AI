@@ -1,3 +1,69 @@
+<!-- App Startup Splash Screen -->
+<div *ngIf="showSplashScreen()" class="app-splash-screen" [class.splash-fading]="splashFading()">
+  <!-- Ambient background glow elements -->
+  <div class="splash-glow-sphere top-glow"></div>
+  <div class="splash-glow-sphere bottom-glow"></div>
+
+  <!-- Top Skip Button -->
+  <button class="splash-skip-btn" (click)="skipSplash()" title="Skip into App">
+    Skip ➔
+  </button>
+
+  <div class="splash-content">
+    <!-- Pulsing Animated Emergency Emblem -->
+    <div class="splash-emblem-wrap">
+      <div class="splash-radar-ring ring-1"></div>
+      <div class="splash-radar-ring ring-2"></div>
+      <div class="splash-radar-ring ring-3"></div>
+      <div class="splash-emblem">
+        <span class="splash-emblem-icon">🚨</span>
+      </div>
+    </div>
+
+    <!-- Title & Brand -->
+    <div class="splash-brand">
+      <h1 class="splash-title">Helpvoice <span class="highlight-ai">AI</span></h1>
+      <p class="splash-tagline">Autonomous Emergency Response & AI Dispatch</p>
+    </div>
+
+    <!-- Multilingual Capability Badges -->
+    <div class="splash-lang-pill">
+      <span>English</span>
+      <span class="pill-dot">•</span>
+      <span>हिन्दी</span>
+      <span class="pill-dot">•</span>
+      <span>मराठी</span>
+    </div>
+
+    <!-- Animated Heartbeat / Waveform Graphic -->
+    <div class="splash-waveform">
+      <span class="bar bar-1"></span>
+      <span class="bar bar-2"></span>
+      <span class="bar bar-3"></span>
+      <span class="bar bar-4"></span>
+      <span class="bar bar-5"></span>
+      <span class="bar bar-6"></span>
+      <span class="bar bar-7"></span>
+    </div>
+
+    <!-- Progress & Status Loader -->
+    <div class="splash-loader-box">
+      <div class="splash-progress-track">
+        <div class="splash-progress-bar" [style.width.%]="splashProgress()"></div>
+      </div>
+      <div class="splash-status-text">
+        <span class="splash-spinner">⚡</span>
+        <span>{{ splashStepText() }}</span>
+      </div>
+    </div>
+
+    <!-- Footer Disclaimer -->
+    <div class="splash-footer">
+      <p class="splash-disclaimer">Always call <strong>112</strong> directly in life-threatening medical emergencies</p>
+    </div>
+  </div>
+</div>
+
 <div class="emergency-app-shell">
   <!-- Top Emergency Alert Bar -->
   <header class="app-header">
@@ -14,17 +80,32 @@
       </div>
 
       <div class="header-controls">
-        <!-- Language Switcher -->
+        <!-- Language Switcher Quick Chips -->
         <div class="lang-selector">
-          <button [class.active]="currentLanguage() === 'en'" (click)="setLanguage('en')">EN</button>
-          <button [class.active]="currentLanguage() === 'hi'" (click)="setLanguage('hi')">हिन्दी</button>
-          <button [class.active]="currentLanguage() === 'mr'" (click)="setLanguage('mr')">मराठी</button>
+          <button [class.active]="settingsService.currentLanguage() === 'en'" (click)="setLanguage('en')">EN</button>
+          <button [class.active]="settingsService.currentLanguage() === 'hi'" (click)="setLanguage('hi')">हिन्दी</button>
+          <button [class.active]="settingsService.currentLanguage() === 'mr'" (click)="setLanguage('mr')">मराठी</button>
+        </div>
+
+        <!-- Settings Modal Button -->
+        <button class="header-icon-btn" (click)="openSettings()" title="Settings (Languages, Theme, Voice)">
+          ⚙️
+        </button>
+
+        <!-- Auth Status Button -->
+        <button *ngIf="!authService.isAuthenticated()" class="header-auth-btn" (click)="openLoginModal()" title="Login / Register">
+          <span>👤 Login</span>
+        </button>
+
+        <div *ngIf="authService.isAuthenticated()" class="header-user-badge">
+          <span class="user-name" title="{{ authService.currentUser()?.email }}">👤 {{ authService.currentUser()?.name }}</span>
+          <button class="user-logout-btn" (click)="handleLogout()" title="Logout">Logout</button>
         </div>
 
         <!-- Quick 112 Call Button -->
         <button class="emergency-call-btn" (click)="callEmergency()">
           <span class="phone-icon">📞</span>
-          <span class="btn-text">CALL 112</span>
+          <span class="btn-text">112 SOS</span>
         </button>
 
         <!-- Exit App Button -->
@@ -51,17 +132,111 @@
     </div>
   </div>
 
+  <!-- Hands-Free Voice SOS Quick Action Bar -->
+  <div class="voice-sos-trigger-bar">
+    <button class="voice-sos-help-btn" (click)="toggleVoiceGuide()">
+      <span class="btn-voice-icon">🎙️</span>
+      <span>Hands-Free Voice SOS Tips</span>
+    </button>
+    <button class="voice-sos-test-btn" (click)="triggerTestVoiceSos()">
+      <span>⚡ Test Hands-Free SOS</span>
+    </button>
+  </div>
+
   <main class="main-content">
+    <!-- Active Direct Call Banner -->
+    <div *ngIf="activeCallNotice()" class="active-call-banner">
+      <span class="call-pulse-icon">📞</span>
+      <span class="call-notice-text">{{ activeCallNotice() }}</span>
+    </div>
+
+    <!-- Hands-Free Voice Triggered Banner -->
+    <div *ngIf="voiceAutoTriggered()" class="voice-triggered-banner">
+      <span class="flash-icon">⚡</span>
+      <span class="banner-text">Hands-Free Voice Emergency Active (Mic Listening Automatically)</span>
+    </div>
+
     <!-- Notice / Alert Banner -->
     <div *ngIf="fallbackNotice()" class="fallback-alert-banner">
       <span class="alert-icon">ℹ️</span>
       <span class="alert-text">{{ fallbackNotice() }}</span>
     </div>
 
+    <!-- Multi-Emergency Services Directory -->
+    <section class="services-directory-card">
+      <div class="card-header-flex">
+        <div>
+          <h2 class="section-title">🚨 Emergency Helplines (Direct Dial)</h2>
+          <p class="section-desc">One-tap calling or say <em>"Call Police"</em>, <em>"Call Fire"</em>, <em>"Call 100"</em></p>
+        </div>
+      </div>
+
+      <div class="services-grid">
+        <button
+          *ngFor="let s of authService.emergencyServices"
+          class="service-chip-btn"
+          [attr.data-service]="s.badgeClass"
+          (click)="callNumber(s.code, s.name)">
+          <div class="service-left">
+            <span class="service-icon">{{ s.icon }}</span>
+            <div class="service-info">
+              <span class="service-name">{{ s.name }}</span>
+              <span class="service-desc">{{ s.desc }}</span>
+            </div>
+          </div>
+          <div class="service-code-pill">
+            <span>📞 {{ s.code }}</span>
+          </div>
+        </button>
+      </div>
+    </section>
+
+    <!-- Personal Emergency Contacts Section -->
+    <section class="contacts-card">
+      <div class="card-header-flex">
+        <div>
+          <h2 class="section-title">👥 Family & Friends Emergency Contacts</h2>
+          <p class="section-desc">Say <em>"Call [Name]"</em> (e.g. <strong>"Call Papa"</strong> or <strong>"Mummy ko phone lagao"</strong>) to dial hands-free.</p>
+        </div>
+        <button class="add-contact-btn" (click)="openAddContactModal()">
+          + Add Contact
+        </button>
+      </div>
+
+      <div *ngIf="authService.emergencyContacts().length === 0" class="empty-contacts-box">
+        <p>No custom contacts added yet. Tap "+ Add Contact" to add family, doctor, or friends.</p>
+      </div>
+
+      <div *ngIf="authService.emergencyContacts().length > 0" class="contacts-list">
+        <div *ngFor="let c of authService.emergencyContacts()" class="contact-item">
+          <div class="contact-avatar-badge">
+            <span>{{ c.name.charAt(0).toUpperCase() }}</span>
+          </div>
+          <div class="contact-details">
+            <div class="contact-top-row">
+              <h4 class="contact-name">{{ c.name }}</h4>
+              <span class="contact-relation-badge">{{ c.relation || 'Contact' }}</span>
+              <span *ngIf="c.isPrimary" class="primary-badge">Primary</span>
+            </div>
+            <p class="contact-phone">{{ c.phone }}</p>
+            <span class="voice-hint">🗣️ Say: "Call {{ c.name }}"</span>
+          </div>
+          <div class="contact-actions">
+            <button class="contact-call-btn" (click)="callNumber(c.phone, c.name)" title="Call {{ c.name }}">
+              📞 Call
+            </button>
+            <button class="contact-del-btn" (click)="handleDeleteContact(c.id)" title="Remove Contact">
+              🗑️
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Emergency Dispatch Input Section -->
     <section class="dispatch-card">
-      <h2 class="section-title">Emergency Voice & Text Dispatch</h2>
-      <p class="section-desc">Speak or type the emergency situation in English, Hindi, or Marathi.</p>
+      <h2 class="section-title">🎙️ AI Emergency Voice & Text Triage</h2>
+      <p class="section-desc">Speak or type symptoms/situation in English, Hindi, or Marathi for instant triage.</p>
 
       <!-- Voice Interaction Area -->
       <div class="voice-interaction-area">
@@ -73,7 +248,7 @@
           <span class="mic-icon">{{ isListening() ? '⏹' : '🎙' }}</span>
         </button>
         <span class="mic-status-label">
-          {{ isListening() ? 'Listening... Speak clearly now' : 'Tap microphone to speak emergency' }}
+          {{ isListening() ? 'Listening... Speak emergency or command ("Call Papa") now' : 'Tap microphone to speak emergency or call command' }}
         </span>
       </div>
 
@@ -82,7 +257,7 @@
         <textarea
           class="emergency-textarea"
           rows="3"
-          placeholder="Describe emergency (e.g. 'Accident with heavy bleeding at Shivaji Nagar' or 'मरीज बेहोश है')..."
+          placeholder="Describe emergency (e.g. 'Accident with heavy bleeding at Shivaji Nagar' or 'Call Papa' or 'मरीज बेहोश है')..."
           [ngModel]="emergencyText()"
           (ngModelChange)="emergencyText.set($event)">
         </textarea>
@@ -223,6 +398,366 @@
         </button>
         <button class="exit-btn-exit" (click)="confirmExit()">
           Exit App
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hands-Free Voice Guide Modal -->
+  <div *ngIf="showVoiceGuide()" class="exit-modal-backdrop" (click)="toggleVoiceGuide()">
+    <div class="exit-modal-card voice-guide-modal-card" (click)="$event.stopPropagation()">
+      <div class="voice-guide-header">
+        <span class="voice-guide-icon">🗣️</span>
+        <h3 class="exit-modal-title">Hands-Free Emergency Voice SOS</h3>
+      </div>
+      <div class="voice-guide-body">
+        <p class="voice-guide-desc">
+          In severe accidents or injuries when you cannot hold or tap the phone screen:
+        </p>
+
+        <div class="voice-tip-card">
+          <div class="tip-badge">Option 1</div>
+          <div class="tip-content">
+            <h4 class="tip-title">Google Assistant (Locked Screen / Pocket)</h4>
+            <p class="tip-text">Speak aloud: <strong>"Hey Google, open Helpvoice emergency"</strong> or <strong>"Hey Google, ask Helpvoice for help"</strong>.</p>
+            <p class="tip-subtext">The screen turns on, bypasses the lock, and starts recording voice analysis immediately.</p>
+          </div>
+        </div>
+
+        <div class="voice-tip-card">
+          <div class="tip-badge">Option 2</div>
+          <div class="tip-content">
+            <h4 class="tip-title">Rapid 5-Tap Power Button SOS</h4>
+            <p class="tip-text">Quickly click your phone's physical power button <strong>5 times</strong> to trigger hardware emergency response.</p>
+          </div>
+        </div>
+
+        <div class="voice-tip-card">
+          <div class="tip-badge">Option 3</div>
+          <div class="tip-content">
+            <h4 class="tip-title">Bluetooth / Earbuds Voice Tap</h4>
+            <p class="tip-text">Tap your Bluetooth earphone button to activate assistant and speak emergency commands.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="exit-modal-buttons">
+        <button class="exit-btn-cancel" (click)="toggleVoiceGuide()">
+          Close
+        </button>
+        <button class="voice-simulate-btn" (click)="toggleVoiceGuide(); triggerTestVoiceSos()">
+          ⚡ Test Hands-Free Trigger
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Authentication Modal (Login / Sign Up) -->
+  <div *ngIf="showAuthModal()" class="exit-modal-backdrop" (click)="closeAuthModal()">
+    <div class="exit-modal-card auth-modal-card" (click)="$event.stopPropagation()">
+      <div class="auth-modal-header">
+        <span class="auth-modal-icon">🔐</span>
+        <h3 class="exit-modal-title">{{ authMode() === 'login' ? 'User Login' : 'Create Emergency Profile' }}</h3>
+      </div>
+
+      <div class="auth-toggle-tabs">
+        <button [class.active]="authMode() === 'login'" (click)="openLoginModal()">Login</button>
+        <button [class.active]="authMode() === 'register'" (click)="openRegisterModal()">Sign Up</button>
+      </div>
+
+      <div *ngIf="authError()" class="auth-error-banner">
+        <span>⚠️ {{ authError() }}</span>
+      </div>
+
+      <form class="auth-form" (ngSubmit)="handleAuthSubmit()">
+        <div *ngIf="authMode() === 'register'" class="form-group">
+          <label class="form-label">Full Name</label>
+          <input
+            type="text"
+            class="form-input"
+            placeholder="e.g. Yash Patil"
+            [ngModel]="authName()"
+            (ngModelChange)="authName.set($event)"
+            name="authName"
+            required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input
+            type="email"
+            class="form-input"
+            placeholder="e.g. user@example.com"
+            [ngModel]="authEmail()"
+            (ngModelChange)="authEmail.set($event)"
+            name="authEmail"
+            required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input
+            type="password"
+            class="form-input"
+            placeholder="••••••••"
+            [ngModel]="authPassword()"
+            (ngModelChange)="authPassword.set($event)"
+            name="authPassword"
+            required />
+        </div>
+
+        <div class="auth-modal-buttons">
+          <button type="button" class="exit-btn-cancel" (click)="closeAuthModal()">Cancel</button>
+          <button type="submit" class="auth-submit-btn" [disabled]="authLoading()">
+            <span *ngIf="authLoading()">Processing...</span>
+            <span *ngIf="!authLoading()">{{ authMode() === 'login' ? 'Login' : 'Create Account' }}</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Emergency Contact Modal -->
+  <div *ngIf="showAddContactModal()" class="exit-modal-backdrop" (click)="closeAddContactModal()">
+    <div class="exit-modal-card auth-modal-card" (click)="$event.stopPropagation()">
+      <div class="auth-modal-header">
+        <span class="auth-modal-icon">👥</span>
+        <h3 class="exit-modal-title">Add Emergency Contact</h3>
+      </div>
+
+      <div *ngIf="contactError()" class="auth-error-banner">
+        <span>⚠️ {{ contactError() }}</span>
+      </div>
+
+      <form class="auth-form" (ngSubmit)="handleAddContactSubmit()">
+        <div class="form-group">
+          <label class="form-label">Contact Name (Spoken Trigger)</label>
+          <input
+            type="text"
+            class="form-input"
+            placeholder="e.g. Papa, Mom, Dr. Sharma, Rahul"
+            [ngModel]="contactName()"
+            (ngModelChange)="contactName.set($event)"
+            name="contactName"
+            required />
+          <span class="field-hint">You can say <strong>"Call {{ contactName() || '[Name]' }}"</strong> to dial instantly.</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Phone Number</label>
+          <input
+            type="tel"
+            class="form-input"
+            placeholder="e.g. 9876543210"
+            [ngModel]="contactPhone()"
+            (ngModelChange)="contactPhone.set($event)"
+            name="contactPhone"
+            required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Relationship / Role</label>
+          <select
+            class="form-input"
+            [ngModel]="contactRelation()"
+            (ngModelChange)="contactRelation.set($event)"
+            name="contactRelation">
+            <option value="Father">Father (Papa)</option>
+            <option value="Mother">Mother (Mom/Aai)</option>
+            <option value="Spouse">Spouse / Partner</option>
+            <option value="Doctor">Doctor / Physician</option>
+            <option value="Sibling">Brother / Sister</option>
+            <option value="Friend">Friend / Colleague</option>
+            <option value="Neighbor">Neighbor</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-checkbox-row">
+          <input
+            type="checkbox"
+            id="isPrimary"
+            [ngModel]="contactIsPrimary()"
+            (ngModelChange)="contactIsPrimary.set($event)"
+            name="contactIsPrimary" />
+          <label for="isPrimary">Set as Primary Emergency Contact</label>
+        </div>
+
+        <div class="auth-modal-buttons">
+          <button type="button" class="exit-btn-cancel" (click)="closeAddContactModal()">Cancel</button>
+          <button type="submit" class="auth-submit-btn">Save Contact</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Settings Modal (Languages, Themes, Voice Speed, Emergency Preferences) -->
+  <div *ngIf="showSettingsModal()" class="exit-modal-backdrop" (click)="closeSettings()">
+    <div class="exit-modal-card settings-modal-card" (click)="$event.stopPropagation()">
+      <div class="settings-modal-header">
+        <div class="header-left-title">
+          <span class="settings-modal-icon">⚙️</span>
+          <div>
+            <h3 class="exit-modal-title">Settings & Preferences</h3>
+            <p class="settings-modal-sub">Customize languages, theme, voice speed, and emergency hotlines</p>
+          </div>
+        </div>
+        <button class="modal-close-x" (click)="closeSettings()">✕</button>
+      </div>
+
+      <div class="settings-content-scroll">
+        <!-- 1. Theme Selection (Dark / Light / Auto) -->
+        <div class="settings-section">
+          <h4 class="settings-section-title">🎨 Theme & Display Mode</h4>
+          <div class="theme-options-grid">
+            <button
+              class="theme-btn"
+              [class.active]="settingsService.currentTheme() === 'dark'"
+              (click)="setTheme('dark')">
+              <span class="theme-icon">🌙</span>
+              <span class="theme-name">Dark Mode</span>
+              <span class="theme-desc">Obsidian & high-contrast red</span>
+            </button>
+            <button
+              class="theme-btn"
+              [class.active]="settingsService.currentTheme() === 'light'"
+              (click)="setTheme('light')">
+              <span class="theme-icon">☀️</span>
+              <span class="theme-name">Light Mode</span>
+              <span class="theme-desc">Crisp clinical high-visibility</span>
+            </button>
+            <button
+              class="theme-btn"
+              [class.active]="settingsService.currentTheme() === 'auto'"
+              (click)="setTheme('auto')">
+              <span class="theme-icon">💻</span>
+              <span class="theme-name">System Auto</span>
+              <span class="theme-desc">Follows device OS mode</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Multilingual Selection -->
+        <div class="settings-section">
+          <div class="section-title-flex">
+            <h4 class="settings-section-title">🌐 Language & Voice Recognition</h4>
+            <span class="current-lang-pill">Active: {{ settingsService.currentLanguage().toUpperCase() }}</span>
+          </div>
+          <p class="settings-desc">Choose your preferred language for speech recognition, triage, and instructions:</p>
+
+          <div class="languages-grid">
+            <button
+              *ngFor="let lang of settingsService.supportedLanguages"
+              class="language-card-btn"
+              [class.active]="settingsService.currentLanguage() === lang.code"
+              (click)="setLanguage(lang.code)">
+              <span class="lang-flag">{{ lang.flag }}</span>
+              <div class="lang-text">
+                <span class="lang-native">{{ lang.nativeName }}</span>
+                <span class="lang-english">{{ lang.name }} ({{ lang.speechLocale }})</span>
+              </div>
+              <span *ngIf="settingsService.currentLanguage() === lang.code" class="check-mark">✓</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. Voice Speed & Audio Prompts -->
+        <div class="settings-section">
+          <h4 class="settings-section-title">🎙️ Audio Prompts & Speech Speed</h4>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-title">Spoken Voice Announcements (TTS)</span>
+              <span class="setting-desc">Speak aloud emergency analysis, calling status, and steps</span>
+            </div>
+            <button
+              class="toggle-switch-btn"
+              [class.on]="settingsService.audioPromptsEnabled()"
+              (click)="toggleAudioPrompts()">
+              {{ settingsService.audioPromptsEnabled() ? 'ENABLED' : 'DISABLED' }}
+            </button>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-title">Voice Speaking Speed (Rate)</span>
+              <span class="setting-desc">Adjust how fast Helpvoice AI speaks emergency instructions</span>
+            </div>
+            <div class="speed-pill-group">
+              <button [class.active]="settingsService.voiceSpeed() === 0.8" (click)="setVoiceSpeed(0.8)">0.8x</button>
+              <button [class.active]="settingsService.voiceSpeed() === 1.0" (click)="setVoiceSpeed(1.0)">1.0x (Normal)</button>
+              <button [class.active]="settingsService.voiceSpeed() === 1.2" (click)="setVoiceSpeed(1.2)">1.2x (Fast)</button>
+            </div>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-title">Haptic Vibration Feedback</span>
+              <span class="setting-desc">Vibrate phone on mic activation and emergency triggers</span>
+            </div>
+            <button
+              class="toggle-switch-btn"
+              [class.on]="settingsService.hapticEnabled()"
+              (click)="toggleHaptic()">
+              {{ settingsService.hapticEnabled() ? 'ENABLED' : 'DISABLED' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. Default Emergency Hotline -->
+        <div class="settings-section">
+          <h4 class="settings-section-title">🚨 Primary Quick-Dial Hotline</h4>
+          <p class="settings-desc">Choose which emergency service the main SOS button dials by default:</p>
+
+          <div class="hotline-options-grid">
+            <button
+              class="hotline-btn"
+              [class.active]="settingsService.defaultEmergencyNumber() === '112'"
+              (click)="setDefaultEmergencyNumber('112')">
+              <span class="hotline-badge">112</span>
+              <span class="hotline-name">National All-in-One SOS</span>
+            </button>
+            <button
+              class="hotline-btn"
+              [class.active]="settingsService.defaultEmergencyNumber() === '100'"
+              (click)="setDefaultEmergencyNumber('100')">
+              <span class="hotline-badge police">100</span>
+              <span class="hotline-name">Police Control Room</span>
+            </button>
+            <button
+              class="hotline-btn"
+              [class.active]="settingsService.defaultEmergencyNumber() === '101'"
+              (click)="setDefaultEmergencyNumber('101')">
+              <span class="hotline-badge fire">101</span>
+              <span class="hotline-name">Fire & Rescue</span>
+            </button>
+            <button
+              class="hotline-btn"
+              [class.active]="settingsService.defaultEmergencyNumber() === '108'"
+              (click)="setDefaultEmergencyNumber('108')">
+              <span class="hotline-badge ambulance">108</span>
+              <span class="hotline-name">Ambulance Emergency</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 5. App Info & Reset -->
+        <div class="settings-section about-section">
+          <div class="about-flex">
+            <div>
+              <span class="about-title">Helpvoice AI Emergency Dispatch</span>
+              <span class="about-ver">Version 1.2.0 • Offline-Resilient Multilingual Build</span>
+            </div>
+            <button class="reset-settings-btn" (click)="resetSettings()">
+              Reset Defaults
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-modal-footer">
+        <button class="settings-done-btn" (click)="closeSettings()">
+          Done / Save
         </button>
       </div>
     </div>

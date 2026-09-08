@@ -3,6 +3,7 @@ import cors from 'cors';
 import healthRoutes from './routes/health.routes';
 import aiRoutes from './routes/ai.routes';
 import emergencyRoutes from './routes/emergency.routes';
+import authRoutes from './routes/auth.routes';
 import { config } from './config/env';
 
 export function createApp(): Express {
@@ -64,6 +65,7 @@ export function createApp(): Express {
 
   // Routes
   app.use('/api', healthRoutes);
+  app.use('/api/auth', authRoutes);
   app.use('/api/ai', aiRoutes);
   app.use('/api/emergency', emergencyRoutes);
 
