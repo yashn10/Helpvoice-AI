@@ -1,0 +1,204 @@
+<div class="emergency-app-shell">
+  <!-- Top Emergency Alert Bar -->
+  <header class="app-header">
+    <div class="header-content">
+      <div class="brand-group">
+        <div class="sos-icon-badge">
+          <span class="pulse-ring"></span>
+          <span class="icon-inner">🚨</span>
+        </div>
+        <div>
+          <h1 class="app-title">Helpvoice AI</h1>
+          <p class="app-subtitle">Emergency Response & Dispatch Assistant</p>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <!-- Language Switcher -->
+        <div class="lang-selector">
+          <button [class.active]="currentLanguage() === 'en'" (click)="setLanguage('en')">EN</button>
+          <button [class.active]="currentLanguage() === 'hi'" (click)="setLanguage('hi')">हिन्दी</button>
+          <button [class.active]="currentLanguage() === 'mr'" (click)="setLanguage('mr')">मराठी</button>
+        </div>
+
+        <!-- Quick 112 Call Button -->
+        <button class="emergency-call-btn" (click)="callEmergency()">
+          <span class="phone-icon">📞</span>
+          <span class="btn-text">CALL 112</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- System Health & Mode Banner -->
+  <div class="system-status-strip">
+    <div class="status-indicator">
+      <span class="dot" [class.dot-green]="healthStatus()?.services?.localAI === 'available'"></span>
+      <span>System: {{ healthStatus()?.status === 'ok' ? 'Online' : 'Offline Mode Active' }}</span>
+    </div>
+    <div class="status-indicator">
+      <span class="badge" [class.badge-primary]="healthStatus()?.services?.groq === 'available'" [class.badge-secondary]="healthStatus()?.services?.groq !== 'available'">
+        {{ healthStatus()?.services?.groq === 'available' ? 'Groq AI Active' : 'Offline Local AI Active' }}
+      </span>
+    </div>
+    <div class="status-indicator">
+      <span>Hospital Provider: {{ healthStatus()?.services?.hospitalProvider || 'demo' }}</span>
+    </div>
+  </div>
+
+  <main class="main-content">
+    <!-- Notice / Alert Banner -->
+    <div *ngIf="fallbackNotice()" class="fallback-alert-banner">
+      <span class="alert-icon">ℹ️</span>
+      <span class="alert-text">{{ fallbackNotice() }}</span>
+    </div>
+
+    <!-- Emergency Dispatch Input Section -->
+    <section class="dispatch-card">
+      <h2 class="section-title">Emergency Voice & Text Dispatch</h2>
+      <p class="section-desc">Speak or type the emergency situation in English, Hindi, or Marathi.</p>
+
+      <!-- Voice Interaction Area -->
+      <div class="voice-interaction-area">
+        <button class="voice-mic-btn" [class.recording]="isListening()" (click)="toggleVoice()" title="Tap to Speak">
+          <div class="mic-rings" *ngIf="isListening()">
+            <span class="ring ring-1"></span>
+            <span class="ring ring-2"></span>
+          </div>
+          <span class="mic-icon">{{ isListening() ? '⏹' : '🎙' }}</span>
+        </button>
+        <span class="mic-status-label">
+          {{ isListening() ? 'Listening... Speak clearly now' : 'Tap microphone to speak emergency' }}
+        </span>
+      </div>
+
+      <!-- Text Input & Submit -->
+      <div class="text-dispatch-form">
+        <textarea
+          class="emergency-textarea"
+          rows="3"
+          placeholder="Describe emergency (e.g. 'Accident with heavy bleeding at Shivaji Nagar' or 'मरीज बेहोश है')..."
+          [ngModel]="emergencyText()"
+          (ngModelChange)="emergencyText.set($event)">
+        </textarea>
+        <button class="analyze-btn" [disabled]="isAnalyzing() || !emergencyText().trim()" (click)="submitEmergency()">
+          <span *ngIf="isAnalyzing()">Analyzing Emergency...</span>
+          <span *ngIf="!isAnalyzing()">⚡ Analyze Situation</span>
+        </button>
+      </div>
+
+      <!-- Test Presets -->
+      <div class="presets-container">
+        <span class="presets-label">Quick Scenarios:</span>
+        <div class="presets-chips">
+          <button *ngFor="let p of presets" class="chip-btn" (click)="selectPreset(p)">
+            {{ p.label }}
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Triage Analysis Result -->
+    <section *ngIf="analysisResult()" class="analysis-results-card">
+      <div class="analysis-header">
+        <div class="severity-badge-container">
+          <span class="severity-pill" [attr.data-severity]="analysisResult()?.severity">
+            {{ analysisResult()?.severity }} SEVERITY
+          </span>
+          <span class="category-pill">{{ analysisResult()?.category }}</span>
+          <span class="source-tag">Source: {{ analysisResult()?.source }}</span>
+        </div>
+        <div class="confidence-meter">
+          <span class="confidence-label">Confidence:</span>
+          <span class="confidence-value">{{ (analysisResult()!.confidence * 100).toFixed(0) }}%</span>
+        </div>
+      </div>
+
+      <div class="emergency-headline">
+        <h3 class="emergency-type-title">{{ analysisResult()?.emergencyType }}</h3>
+        <p class="emergency-summary-text">{{ analysisResult()?.summary }}</p>
+      </div>
+
+      <!-- Immediate Actions Checklist -->
+      <div class="actions-box">
+        <h4 class="actions-title">⚡ Immediate Actions Required:</h4>
+        <ul class="actions-list">
+          <li *ngFor="let act of analysisResult()?.recommendedActions" class="action-item">
+            <span class="check-icon">✓</span>
+            <span>{{ act }}</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="action-buttons-group">
+        <button class="call-primary-btn" (click)="callEmergency()">
+          📞 Dial 112 Emergency
+        </button>
+        <button class="hospital-btn" *ngIf="analysisResult()?.locationRequired">
+          🏥 Find Nearest Trauma Hospital
+        </button>
+      </div>
+    </section>
+
+    <!-- Predefined Safe Guidance Card -->
+    <section *ngIf="guidanceData()" class="guidance-card">
+      <h3 class="guidance-title">First Aid & Critical Safety Steps</h3>
+
+      <div class="guidance-grid">
+        <div class="guidance-column do-column">
+          <h4 class="column-title positive">✓ Immediate Steps (What To Do)</h4>
+          <ul>
+            <li *ngFor="let step of guidanceData()?.immediateSteps">{{ step }}</li>
+          </ul>
+        </div>
+
+        <div class="guidance-column dont-column">
+          <h4 class="column-title negative">✗ What NOT To Do</h4>
+          <ul>
+            <li *ngFor="let dont of guidanceData()?.doNotDo">{{ dont }}</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Emergency Hospital Map / Location Card -->
+    <section class="hospital-card">
+      <div class="card-header-flex">
+        <div>
+          <h3 class="hospital-title">Nearby Emergency Medical Centers</h3>
+          <p class="hospital-subtitle">Locally verified hospitals within 15 km radius</p>
+        </div>
+        <span class="osm-badge">OSM Verified</span>
+      </div>
+
+      <div class="hospital-list">
+        <div class="hospital-item">
+          <div class="hospital-info">
+            <h4 class="hospital-name">Sassoon General Hospital & Trauma Center</h4>
+            <p class="hospital-addr">Near Pune Railway Station, Sangamvadi, Pune (Demo)</p>
+            <span class="distance-pill">📍 1.4 km away</span>
+          </div>
+          <button class="hospital-call-btn" (click)="callEmergency()">Call ER</button>
+        </div>
+
+        <div class="hospital-item">
+          <div class="hospital-info">
+            <h4 class="hospital-name">KEM Hospital Emergency Ward</h4>
+            <p class="hospital-addr">Rasta Peth, Pune, Maharashtra (Demo)</p>
+            <span class="distance-pill">📍 2.1 km away</span>
+          </div>
+          <button class="hospital-call-btn" (click)="callEmergency()">Call ER</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Mobile Sticky Emergency Bar (One-Tap Dialing) -->
+  <div class="mobile-sticky-bar">
+    <button class="mobile-sticky-call-btn" (click)="callEmergency()">
+      <span class="sticky-icon">🚨</span>
+      <span class="sticky-label">ONE-TAP EMERGENCY: CALL 112</span>
+    </button>
+  </div>
+</div>
