@@ -49,17 +49,42 @@ export class AuthService {
     { code: '1091', name: 'Women Helpline', desc: 'Safety & Support', icon: '🛡️', badgeClass: 'women' },
   ];
 
+  private userKey = 'helpvoice_cached_user';
+
   constructor() {
     this.initAuth();
   }
 
   private initAuth(): void {
     const token = this.getToken();
-    if (token) {
+    const cachedUser = this.getCachedUser();
+
+    if (token && cachedUser) {
+      this.currentUser.set(cachedUser);
+      this.isAuthenticated.set(true);
+      this.emergencyContacts.set(cachedUser.emergencyContacts || []);
+      this.fetchProfile().subscribe();
+    } else if (token) {
       this.fetchProfile().subscribe();
     } else {
+      this.isAuthenticated.set(false);
       this.loadLocalContacts();
     }
+  }
+
+  public getCachedUser(): UserProfile | null {
+    try {
+      const raw = localStorage.getItem(this.userKey);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private setCachedUser(user: UserProfile): void {
+    try {
+      localStorage.setItem(this.userKey, JSON.stringify(user));
+    } catch {}
   }
 
   public getToken(): string | null {
@@ -79,6 +104,7 @@ export class AuthService {
   private removeToken(): void {
     try {
       localStorage.removeItem(this.tokenKey);
+      localStorage.removeItem(this.userKey);
     } catch {}
   }
 
@@ -95,6 +121,7 @@ export class AuthService {
       tap((res) => {
         if (res.success && res.data) {
           this.setToken(res.data.token);
+          this.setCachedUser(res.data.user);
           this.currentUser.set(res.data.user);
           this.isAuthenticated.set(true);
           this.emergencyContacts.set(res.data.user.emergencyContacts || []);
@@ -113,6 +140,7 @@ export class AuthService {
       tap((res) => {
         if (res.success && res.data) {
           this.setToken(res.data.token);
+          this.setCachedUser(res.data.user);
           this.currentUser.set(res.data.user);
           this.isAuthenticated.set(true);
           this.emergencyContacts.set(res.data.user.emergencyContacts || []);
@@ -210,21 +238,15 @@ export class AuthService {
       const raw = localStorage.getItem(this.localContactsKey);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           this.emergencyContacts.set(parsed);
           return;
         }
       }
     } catch {}
 
-    // Initial default demo contacts
-    const defaultContacts: EmergencyContact[] = [
-      { id: 'cnt_1', name: 'Papa', phone: '9876543210', relation: 'Father', isPrimary: true },
-      { id: 'cnt_2', name: 'Mom', phone: '9876543211', relation: 'Mother' },
-      { id: 'cnt_3', name: 'Family Doctor', phone: '9876543212', relation: 'Doctor' },
-    ];
-    this.emergencyContacts.set(defaultContacts);
-    this.saveLocalContacts(defaultContacts);
+    // Only user-added contacts are kept (starts empty)
+    this.emergencyContacts.set([]);
   }
 
   private saveLocalContacts(contacts: EmergencyContact[]): void {

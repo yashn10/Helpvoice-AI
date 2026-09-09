@@ -391,7 +391,12 @@ export class App implements OnInit, OnDestroy {
     this.checkVoiceAutoTrigger('helpvoice://emergency?auto_listen=true');
   }
 
-  // Auth Modal Handlers
+  // Auth Screen Handlers
+  public setAuthMode(mode: 'login' | 'register'): void {
+    this.authMode.set(mode);
+    this.authError.set(null);
+  }
+
   public openLoginModal(): void {
     this.authMode.set('login');
     this.authError.set(null);
@@ -455,6 +460,10 @@ export class App implements OnInit, OnDestroy {
 
   public handleLogout(): void {
     this.authService.logout();
+    this.authEmail.set('');
+    this.authPassword.set('');
+    this.authName.set('');
+    this.authError.set(null);
   }
 
   // Custom Emergency Contacts Handlers

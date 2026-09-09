@@ -64,7 +64,123 @@
   </div>
 </div>
 
-<div class="emergency-app-shell">
+<!-- Dedicated Full-Screen Authentication Gateway (Only Logged-in Users Can Access App) -->
+<div *ngIf="!showSplashScreen() && !authService.isAuthenticated()" class="auth-gateway-screen">
+  <!-- Ambient background glow elements -->
+  <div class="auth-glow-sphere top-glow"></div>
+  <div class="auth-glow-sphere bottom-glow"></div>
+
+  <!-- Top Quick Control Bar -->
+  <div class="auth-top-bar">
+    <div class="auth-lang-chips">
+      <button [class.active]="settingsService.currentLanguage() === 'en'" (click)="setLanguage('en')">EN</button>
+      <button [class.active]="settingsService.currentLanguage() === 'hi'" (click)="setLanguage('hi')">हिन्दी</button>
+      <button [class.active]="settingsService.currentLanguage() === 'mr'" (click)="setLanguage('mr')">मराठी</button>
+    </div>
+
+    <div class="auth-top-actions">
+      <button class="header-icon-btn" (click)="openSettings()" title="Settings (Languages, Theme, Voice)">
+        ⚙️
+      </button>
+      <button class="header-exit-btn" (click)="promptExit()" title="Exit App">
+        ✕
+      </button>
+    </div>
+  </div>
+
+  <div class="auth-card-wrapper">
+    <!-- Brand Header -->
+    <div class="auth-brand-header">
+      <div class="auth-logo-badge">
+        <span class="auth-pulse-ring"></span>
+        <span class="auth-logo-icon">🚨</span>
+      </div>
+      <h1 class="auth-title">Helpvoice <span class="highlight-ai">AI</span></h1>
+      <p class="auth-tagline">Autonomous Multilingual Emergency Response & AI Dispatch</p>
+      
+      <div class="auth-badge-pill">
+        <span class="lock-icon">🔒</span>
+        <span>Responder Login Required</span>
+      </div>
+    </div>
+
+    <!-- Auth Card Body -->
+    <div class="auth-card-body">
+      <!-- Switch Tabs -->
+      <div class="auth-toggle-tabs">
+        <button [class.active]="authMode() === 'login'" (click)="setAuthMode('login')">
+          Sign In
+        </button>
+        <button [class.active]="authMode() === 'register'" (click)="setAuthMode('register')">
+          Create Account
+        </button>
+      </div>
+
+      <!-- Error Alert -->
+      <div *ngIf="authError()" class="auth-error-banner">
+        <span>⚠️ {{ authError() }}</span>
+      </div>
+
+      <form class="auth-form" (ngSubmit)="handleAuthSubmit()">
+        <div *ngIf="authMode() === 'register'" class="form-group">
+          <label class="form-label">Full Name</label>
+          <input
+            type="text"
+            class="form-input"
+            placeholder="e.g. Yash Patil"
+            [ngModel]="authName()"
+            (ngModelChange)="authName.set($event)"
+            name="authName"
+            required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Email Address</label>
+          <input
+            type="email"
+            class="form-input"
+            placeholder="e.g. responder@helpvoice.ai"
+            [ngModel]="authEmail()"
+            (ngModelChange)="authEmail.set($event)"
+            name="authEmail"
+            required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input
+            type="password"
+            class="form-input"
+            placeholder="••••••••"
+            [ngModel]="authPassword()"
+            (ngModelChange)="authPassword.set($event)"
+            name="authPassword"
+            required />
+        </div>
+
+        <button type="submit" class="auth-submit-btn main-submit" [disabled]="authLoading()">
+          <span *ngIf="authLoading()" class="btn-spinner">⚡ Authenticating...</span>
+          <span *ngIf="!authLoading()">{{ authMode() === 'login' ? 'Sign In & Access Dashboard ➔' : 'Create Emergency Profile ➔' }}</span>
+        </button>
+      </form>
+    </div>
+
+    <!-- Direct Emergency SOS Bypass -->
+    <div class="auth-emergency-bypass">
+      <div class="bypass-header">
+        <span class="bypass-icon">🚨</span>
+        <span class="bypass-text">Critical emergency happening right now?</span>
+      </div>
+      <button class="auth-112-call-btn" (click)="callEmergency()">
+        <span class="call-pulse">📞</span>
+        <span class="btn-text">Call 112 SOS Directly (No Login Needed)</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Main Emergency Dashboard (Only for Logged-In Users) -->
+<div *ngIf="!showSplashScreen() && authService.isAuthenticated()" class="emergency-app-shell">
   <!-- Top Emergency Alert Bar -->
   <header class="app-header">
     <div class="header-content">

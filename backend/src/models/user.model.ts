@@ -56,13 +56,16 @@ const EmergencyContactSchema = new Schema<IEmergencyContact>({
 const UserSchema = new Schema<IUserDoc>(
   {
     name: { type: String, required: true },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    email: { type: String, required: true, lowercase: true, trim: true },
     passwordHash: { type: String, required: true },
     emergencyContacts: [EmergencyContactSchema],
     settings: { type: Schema.Types.Mixed, default: {} },
   },
   {
     timestamps: true,
+    bufferCommands: false,
+    autoIndex: false,
+    autoCreate: false,
   }
 );
 

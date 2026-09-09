@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import { config } from '../config/env';
 import { IUser, IEmergencyContact, IUserSettings, localUserStore, UserModel } from '../models/user.model';
 
@@ -48,13 +49,14 @@ export class AuthService {
     }
 
     // Check existing in MongoDB if connected
-    if (UserModel) {
+    if (UserModel && mongoose.connection.readyState === 1) {
       try {
         const existingMongo = await UserModel.findOne({ email: cleanEmail }).exec();
         if (existingMongo) {
           throw new Error('An account with this email already exists');
         }
-      } catch {
+      } catch (e: any) {
+        if (e.message.includes('already exists')) throw e;
         // Continue with local store
       }
     }
@@ -71,7 +73,7 @@ export class AuthService {
     });
 
     // Save to MongoDB in background if connected
-    if (UserModel) {
+    if (UserModel && mongoose.connection.readyState === 1) {
       try {
         await UserModel.create({
           _id: newUser.id,
@@ -108,7 +110,7 @@ export class AuthService {
 
     let user = localUserStore.findByEmail(cleanEmail);
 
-    if (!user && UserModel) {
+    if (!user && UserModel && mongoose.connection.readyState === 1) {
       try {
         const mongoUser = await UserModel.findOne({ email: cleanEmail }).exec();
         if (mongoUser) {
@@ -183,7 +185,7 @@ export class AuthService {
 
     localUserStore.update(userId, { emergencyContacts: contacts });
 
-    if (UserModel) {
+    if (UserModel && mongoose.connection.readyState === 1) {
       try {
         await UserModel.findByIdAndUpdate(userId, { emergencyContacts: contacts }).exec();
       } catch {
@@ -203,7 +205,7 @@ export class AuthService {
     const contacts = (user.emergencyContacts || []).filter((c) => c.id !== contactId);
     localUserStore.update(userId, { emergencyContacts: contacts });
 
-    if (UserModel) {
+    if (UserModel && mongoose.connection.readyState === 1) {
       try {
         await UserModel.findByIdAndUpdate(userId, { emergencyContacts: contacts }).exec();
       } catch {
@@ -235,7 +237,7 @@ export class AuthService {
 
     localUserStore.update(userId, { settings: mergedSettings });
 
-    if (UserModel) {
+    if (UserModel && mongoose.connection.readyState === 1) {
       try {
         await UserModel.findByIdAndUpdate(userId, { settings: mergedSettings }).exec();
       } catch {
